@@ -87,72 +87,80 @@
   </div>
 
   <script>
-    const API_URL = "https://script.google.com/macros/s/AKfycbzSyLi9BXuzKVBIChPbNtV4puLtQ0QpQARQSEOuispmKI87TGtrBygYbS_l6wt_d6cV/exec";
-    let foods = [];
+  // MUST start with https://script.google.com/macros/s/ ... and end in /exec
+  const API_URL = "PASTE_YOUR_COPIED_EXEC_URL_HERE";
+  let foods = [];
 
-    // Fetch master foods from Sheets
-    fetch(API_URL)
-      .then(res => res.json())
-      .then(data => {
-        foods = data;
-        const sel = document.getElementById("foodSelect");
-        sel.innerHTML = foods.map((f, i) => `<option value="${i}">${f.name}</option>`).join("");
-        calculate();
-      });
+  // 1. Fetch foods using JSONP to eliminate CORS on GET
+  function loadFoods() {
+    const script = document.createElement("script");
+    script.src = `${API_URL}?callback=handleFoodsData`;
+    document.body.appendChild(script);
+  }
 
-    function getSelectedCalculations() {
-      const idx = document.getElementById("foodSelect").value;
-      const servings = parseFloat(document.getElementById("servings").value) || 0;
-      const f = foods[idx] || { cal: 0, p: 0, f: 0, c: 0, name: "" };
-      
-      return {
-        name: f.name,
-        num_servings: servings,
-        cal: Math.round(f.cal * servings),
-        p: (f.p * servings).toFixed(1),
-        f: (f.f * servings).toFixed(1),
-        c: (f.c * servings).toFixed(1)
-      };
+  // Callback executed when foods load
+  window.handleFoodsData = function(data) {
+    foods = data;
+    const sel = document.getElementById("foodSelect");
+    if (!foods || foods.length === 0) {
+      sel.innerHTML = "<option>No foods found in sheet</option>";
+      return;
     }
+    sel.innerHTML = foods.map((f, i) => `<option value="${i}">${f.name}</option>`).join("");
+    calculate();
+  };
 
-    function calculate() {
-      if (!foods.length) return;
-      const cur = getSelectedCalculations();
-      document.getElementById("dispCal").innerText = cur.cal;
-      document.getElementById("dispP").innerText = cur.p + "g";
-      document.getElementById("dispF").innerText = cur.f + "g";
-      document.getElementById("dispC").innerText = cur.c + "g";
-    }
+  loadFoods();
 
-    function submitLog() {
-        const payload = getSelectedCalculations();
-        const statusEl = document.getElementById("status");
-        statusEl.innerText = "Saving...";
+  function getSelectedCalculations() {
+    const idx = document.getElementById("foodSelect").value;
+    const servings = parseFloat(document.getElementById("servings").value) || 0;
+    const f = foods[idx] || { cal: 0, p: 0, f: 0, c: 0, name: "" };
 
-        const params = new URLSearchParams({
-            action: "log",
-            name: payload.name,
-            num_servings: payload.num_servings,
-            cal: payload.cal,
-            p: payload.p,
-            f: payload.f,
-            c: payload.c
-        });
+    return {
+      name: f.name,
+      num_servings: servings,
+      cal: Math.round(f.cal * servings),
+      p: (f.p * servings).toFixed(1),
+      f: (f.f * servings).toFixed(1),
+      c: (f.c * servings).toFixed(1)
+    };
+  }
 
-        fetch(`${API_URL}?${params.toString()}`)
-            .then(res => res.json())
-            .then(data => {
-            if (data.status === "success") {
-                statusEl.innerText = "Logged successfully!";
-                setTimeout(() => statusEl.innerText = "", 2500);
-            } else {
-                statusEl.innerText = "Error: " + (data.message || "Failed to log");
-            }
-            })
-            .catch(err => {
-            statusEl.innerText = "Error: " + err;
-            });
-    }
-  </script>
+  function calculate() {
+    if (!foods || !foods.length) return;
+    const cur = getSelectedCalculations();
+    document.getElementById("dispCal").innerText = cur.cal;
+    document.getElementById("dispP").innerText = cur.p + "g";
+    document.getElementById("dispF").innerText = cur.f + "g";
+    document.getElementById("dispC").innerText = cur.c + "g";
+  }
+
+  // 2. Log meal via image ping (immune to CORS restrictions)
+  function submitLog() {
+    const payload = getSelectedCalculations();
+    const statusEl = document.getElementById("status");
+    statusEl.innerText = "Saving...";
+
+    const params = new URLSearchParams({
+      action: "log",
+      name: payload.name,
+      num_servings: payload.num_servings,
+      cal: payload.cal,
+      p: payload.p,
+      f: payload.f,
+      c: payload.c
+    });
+
+    const ping = new Image();
+    ping.src = `${API_URL}?${params.toString()}`;
+
+    // Image ping sends the GET request to Google Apps Script silently
+    setTimeout(() => {
+      statusEl.innerText = "Logged successfully!";
+      setTimeout(() => statusEl.innerText = "", 2500);
+    }, 800);
+  }
+</script>
 </body>
 </html>
