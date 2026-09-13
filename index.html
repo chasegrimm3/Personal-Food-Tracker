@@ -126,19 +126,32 @@
 
     function submitLog() {
         const payload = getSelectedCalculations();
-        document.getElementById("status").innerText = "Saving...";
-        
-        fetch(API_URL, {
-            method: "POST",
-            mode: "no-cors",
-            headers: { "Content-Type": "text/plain;charset=utf-8" },
-            body: JSON.stringify(payload)
-        }).then(() => {
-            document.getElementById("status").innerText = "Logged successfully!";
-            setTimeout(() => document.getElementById("status").innerText = "", 2500);
-        }).catch(err => {
-            document.getElementById("status").innerText = "Error: " + err;
+        const statusEl = document.getElementById("status");
+        statusEl.innerText = "Saving...";
+
+        const params = new URLSearchParams({
+            action: "log",
+            name: payload.name,
+            num_servings: payload.num_servings,
+            cal: payload.cal,
+            p: payload.p,
+            f: payload.f,
+            c: payload.c
         });
+
+        fetch(`${API_URL}?${params.toString()}`)
+            .then(res => res.json())
+            .then(data => {
+            if (data.status === "success") {
+                statusEl.innerText = "Logged successfully!";
+                setTimeout(() => statusEl.innerText = "", 2500);
+            } else {
+                statusEl.innerText = "Error: " + (data.message || "Failed to log");
+            }
+            })
+            .catch(err => {
+            statusEl.innerText = "Error: " + err;
+            });
     }
   </script>
 </body>
