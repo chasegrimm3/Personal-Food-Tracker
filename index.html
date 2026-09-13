@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Food Tracker</title>
@@ -63,17 +64,19 @@
       cursor: pointer;
     }
     button:active { opacity: 0.8; }
-    #status { text-align: center; margin-top: 12px; font-size: 0.85rem; color: #4ade80; }
+    #status { text-align: center; margin-top: 12px; font-size: 0.85rem; color: #4ade80; min-height: 1.2rem; }
   </style>
 </head>
 <body>
   <h1>Log Intake</h1>
   <div class="card">
     <label for="foodSelect">Food Item</label>
-    <select id="foodSelect" onchange="calculate()"><option>Loading database...</option></select>
+    <select id="foodSelect" onchange="calculate()">
+      <option>Loading database...</option>
+    </select>
 
     <label for="servings">Servings</label>
-    <input type="number" id="servings" placeholder="1" value="1" step="0.5" min="0" oninput="calculate()">
+    <input type="number" id="servings" placeholder="1" value="1" step="0.25" min="0" oninput="calculate()">
 
     <div class="macro-preview">
       <div class="macro-box"><div class="macro-val" id="dispCal">0</div><div class="macro-lbl">Cal</div></div>
@@ -87,80 +90,78 @@
   </div>
 
   <script>
-  // MUST start with https://script.google.com/macros/s/ ... and end in /exec
-  const API_URL = "https://script.google.com/macros/s/AKfycby8rxR5_DshOdLOG5zsRbIryrLU1g2LZGC0f5Nwue6BoRdz0Hl2zZifBzhB6OWYayGU/exec";
-  let foods = [];
+    // PASTE YOUR NEW DEPLOYMENT /exec URL HERE:
+    const API_URL = "https://script.google.com/macros/s/AKfycbwE_9t0FmwEDI9NiE4vxshgWM8gMWHLFZ6GbZiC5Z6YKcOE6byFe4wY-Jc9LhmRgBt8/exec";
+    let foods = [];
 
-  // 1. Fetch foods using JSONP to eliminate CORS on GET
-  function loadFoods() {
-    const script = document.createElement("script");
-    script.src = `${API_URL}?callback=handleFoodsData`;
-    document.body.appendChild(script);
-  }
-
-  // Callback executed when foods load
-  window.handleFoodsData = function(data) {
-    foods = data;
-    const sel = document.getElementById("foodSelect");
-    if (!foods || foods.length === 0) {
-      sel.innerHTML = "<option>No foods found in sheet</option>";
-      return;
+    // 1. Fetch food database using script injection (JSONP) - bypasses CORS completely
+    function loadFoods() {
+      const script = document.createElement("script");
+      script.src = `${API_URL}?callback=handleFoodsData`;
+      document.body.appendChild(script);
     }
-    sel.innerHTML = foods.map((f, i) => `<option value="${i}">${f.name}</option>`).join("");
-    calculate();
-  };
 
-  loadFoods();
-
-  function getSelectedCalculations() {
-    const idx = document.getElementById("foodSelect").value;
-    const servings = parseFloat(document.getElementById("servings").value) || 0;
-    const f = foods[idx] || { cal: 0, p: 0, f: 0, c: 0, name: "" };
-
-    return {
-      name: f.name,
-      num_servings: servings,
-      cal: Math.round(f.cal * servings),
-      p: (f.p * servings).toFixed(1),
-      f: (f.f * servings).toFixed(1),
-      c: (f.c * servings).toFixed(1)
+    window.handleFoodsData = function(data) {
+      foods = data;
+      const sel = document.getElementById("foodSelect");
+      if (!foods || foods.length === 0) {
+        sel.innerHTML = "<option>No foods found in sheet</option>";
+        return;
+      }
+      sel.innerHTML = foods.map((f, i) => `<option value="${i}">${f.name}</option>`).join("");
+      calculate();
     };
-  }
 
-  function calculate() {
-    if (!foods || !foods.length) return;
-    const cur = getSelectedCalculations();
-    document.getElementById("dispCal").innerText = cur.cal;
-    document.getElementById("dispP").innerText = cur.p + "g";
-    document.getElementById("dispF").innerText = cur.f + "g";
-    document.getElementById("dispC").innerText = cur.c + "g";
-  }
+    loadFoods();
 
-  // 2. Log meal via image ping (immune to CORS restrictions)
-  function submitLog() {
-    const payload = getSelectedCalculations();
-    const statusEl = document.getElementById("status");
-    statusEl.innerText = "Saving...";
+    function getSelectedCalculations() {
+      const idx = document.getElementById("foodSelect").value;
+      const servings = parseFloat(document.getElementById("servings").value) || 0;
+      const f = foods[idx] || { cal: 0, p: 0, f: 0, c: 0, name: "" };
 
-    const params = new URLSearchParams({
-      action: "log",
-      name: payload.name,
-      num_servings: payload.num_servings,
-      cal: payload.cal,
-      p: payload.p,
-      f: payload.f,
-      c: payload.c
-    });
+      return {
+        name: f.name,
+        num_servings: servings,
+        cal: Math.round(f.cal * servings),
+        p: (f.p * servings).toFixed(1),
+        f: (f.f * servings).toFixed(1),
+        c: (f.c * servings).toFixed(1)
+      };
+    }
 
-    const ping = new Image();
-    ping.src = `${API_URL}?${params.toString()}`;
+    function calculate() {
+      if (!foods || !foods.length) return;
+      const cur = getSelectedCalculations();
+      document.getElementById("dispCal").innerText = cur.cal;
+      document.getElementById("dispP").innerText = cur.p + "g";
+      document.getElementById("dispF").innerText = cur.f + "g";
+      document.getElementById("dispC").innerText = cur.c + "g";
+    }
 
-    // Image ping sends the GET request to Google Apps Script silently
-    setTimeout(() => {
-      statusEl.innerText = "Logged successfully!";
-      setTimeout(() => statusEl.innerText = "", 2500);
-    }, 800);
-  }
-</script>
+    // 2. Submit log using an Image Ping - 100% immune to CORS and redirect errors
+    function submitLog() {
+      const payload = getSelectedCalculations();
+      const statusEl = document.getElementById("status");
+      statusEl.innerText = "Saving...";
+
+      const params = new URLSearchParams({
+        action: "log",
+        name: payload.name,
+        num_servings: payload.num_servings,
+        cal: payload.cal,
+        p: payload.p,
+        f: payload.f,
+        c: payload.c
+      });
+
+      const ping = new Image();
+      ping.src = `${API_URL}?${params.toString()}`;
+
+      setTimeout(() => {
+        statusEl.innerText = "Logged successfully!";
+        setTimeout(() => { statusEl.innerText = ""; }, 2500);
+      }, 600);
+    }
+  </script>
 </body>
 </html>
